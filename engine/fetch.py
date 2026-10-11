@@ -168,17 +168,29 @@ def factset():
             d = today - pd.Timedelta(days=back)
             if d.weekday() not in (3, 4):          # 보통 금요일(휴일 전엔 목요일) 발행
                 continue
-            try:
-                r = _get(base.format(d.strftime("%m%d%y")), tries=1)
+            url = base.format(d.strftime("%m%d%y"))
+            r = None
+            try:   # 브라우저 흉내(curl_cffi) — 일반 요청은 GitHub 서버에서 404로 막힘
+                from curl_cffi import requests as creq
+                rr = creq.get(url, impersonate="chrome", timeout=30)
+                if rr.status_code == 200 and rr.content[:4] == b"%PDF":
+                    r = rr
+                else:
+                    last_err = f"HTTP {rr.status_code}"
             except Exception as e:  # noqa: BLE001
                 last_err = str(e)[-60:]
-                continue
+            if r is None:
+                try:
+                    r = _get(url, tries=1)
+                except Exception as e:  # noqa: BLE001
+                    last_err = str(e)[-60:]
+                    continue
             text = " ".join((p.extract_text() or "") for p in PdfReader(io.BytesIO(r.content)).pages[:6])
             text = re.sub(r"\s+", " ", text)
             out = {"date": str(d.date()), "growth": {}}
             for per, g in re.findall(r"For (Q[1-4] \d{4}|CY ?\d{4}), analysts are projecting earnings growth (?:rate )?of (-?[\d.]+)%", text):
                 out["growth"][per.replace("CY", "CY ").replace("  ", " ")] = float(g)
-            m = re.search(r"blended (?:\(year-over-year\) )?earnings growth rate for the S&P 500 is (-?[\d.]+)%", text)
+            m = re.search(r"(?:blended|estimated) (?:\(year-over-year\) )?earnings growth rate for the S&P 500 is (-?[\d.]+)%", text)
             if m:
                 out["blended"] = float(m.group(1))
             m = re.search(r"forward 12-month P/E ratio for the S&P 500 is ([\d.]+)", text)
