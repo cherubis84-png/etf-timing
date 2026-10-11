@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ETF 국면">
+<meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121417" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
+<title>ETF 국면 전망</title>
+<style>
+:root{
+  --bg:#f6f5f1; --card:#fff; --ink:#16181b; --sub:#5d6168; --faint:#9a9ea5; --line:#e6e3dc; --soft:#efeee9;
+  --up:#d6334a; --up-soft:#fbe5e8; --dn:#2f62d6; --dn-soft:#e3eafb; --mid:#8a8f98;
+  --warn:#b7791f; --warn-soft:#fbf1df;
+  --q1:#d9822b; --q2:#2e9e6b; --q3:#b2456e; --q4:#5b7896;
+  --mono: ui-monospace,"SF Mono",Menlo,monospace; --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#121417; --card:#1b1e23; --ink:#eef0f3; --sub:#a4a9b2; --faint:#6c717a; --line:#2a2e35; --soft:#24282e;
+    --up:#ff5c72; --up-soft:#3a1d23; --dn:#5d8bff; --dn-soft:#1b2640; --mid:#8f949c; --warn:#e0a548; --warn-soft:#352a17;
+    --q1:#f0a050; --q2:#4cc28c; --q3:#d96c95; --q4:#7f9cbb; --shadow:none; }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1100px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 40px)}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:6px 2px 14px}
+h1{font-size:25px;letter-spacing:-.02em;margin:0;font-weight:750}
+.meta{color:var(--sub);font-size:12px;text-align:right}
+.badge{display:inline-block;font-size:11px;font-weight:650;padding:2px 7px;border-radius:99px;background:var(--warn);color:#fff;margin-left:6px;vertical-align:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px}
+.quad{display:inline-flex;align-items:center;gap:8px;font-size:21px;font-weight:750;letter-spacing:-.01em}
+.quad i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.story{margin:10px 0 2px;padding:0;list-style:none}
+.story li{position:relative;padding-left:14px;margin:5px 0;color:var(--ink);font-size:14.5px}
+.story li:before{content:"";position:absolute;left:2px;top:.62em;width:5px;height:5px;border-radius:50%;background:var(--faint)}
+.story li.more{display:none}.story.open li.more{display:list-item}
+.linkbtn{background:none;border:0;color:var(--sub);font:inherit;font-size:13px;padding:4px 0}
+.dims{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+@media (min-width:760px){.dims{grid-template-columns:repeat(4,1fr)}}
+.dim{background:var(--soft);border-radius:12px;padding:9px 11px;cursor:pointer;position:relative}
+.dim .k{font-size:12px;color:var(--sub)}
+.dim .s{font-weight:700;font-size:15.5px}
+.dim .a{font-size:11px;color:var(--faint)}
+.dim .flip{position:absolute;right:8px;top:8px;font-size:10.5px;font-weight:650;color:var(--warn);background:var(--warn-soft);border-radius:99px;padding:1px 6px}
+.dim.open{grid-column:1/-1}
+.dim .ev{display:none;font-size:12.5px;color:var(--sub);margin-top:6px;line-height:1.55}
+.dim.open .ev{display:block}
+.seg{display:flex;background:var(--soft);border-radius:12px;padding:3px;margin:16px 0 12px;position:sticky;top:calc(env(safe-area-inset-top) + 4px);z-index:5}
+.seg button{flex:1;border:0;background:transparent;color:var(--sub);font:inherit;font-weight:600;padding:8px 0;border-radius:9px}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.hz{display:flex;gap:6px;margin-bottom:12px}
+.hz button{flex:1;border:1px solid var(--line);background:var(--card);color:var(--sub);font:inherit;font-size:14px;font-weight:600;padding:9px 0;border-radius:12px}
+.hz button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.sect{display:flex;align-items:baseline;justify-content:space-between;margin:18px 4px 8px}
+.sect h3{margin:0;font-size:15px}
+.sect span{font-size:12px;color:var(--faint)}
+.list{display:grid;grid-template-columns:1fr;gap:8px}
+@media (min-width:760px){.list{grid-template-columns:1fr 1fr}}
+.as{padding:13px 14px;cursor:pointer}
+.as .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.as .nm{font-weight:700;font-size:16px}
+.as .cat{font-size:11.5px;color:var(--faint);margin-left:4px;font-weight:500}
+.ret{font-family:var(--mono);font-size:21px;font-weight:700;letter-spacing:-.02em;text-align:right;line-height:1.1}
+.ret small{display:block;white-space:nowrap;font-family:-apple-system,sans-serif;font-size:11px;font-weight:500;color:var(--faint);letter-spacing:0}
+.line2{font-size:12.5px;color:var(--sub);margin-top:2px}
+.why{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.tag{font-size:11.5px;padding:2px 7px;border-radius:6px;background:var(--soft);color:var(--sub);white-space:nowrap}
+.etfs{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.etf{font-family:var(--mono);font-size:12px;font-weight:700;padding:3px 8px;border-radius:7px;border:1px solid var(--line)}
+.wline{margin-top:8px;font-size:12px;color:var(--warn);display:flex;gap:6px}
+.pill{display:inline-block;font-size:11.5px;font-weight:650;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.dimmed{opacity:.6}
+.neutral{display:flex;flex-wrap:wrap;gap:6px}
+.neutral button{border:1px solid var(--line);background:var(--card);color:var(--sub);font:inherit;font-size:13px;padding:6px 10px;border-radius:10px}
+.small{font-size:12.5px;color:var(--sub)}
+.tiny{font-size:11px;color:var(--faint)}
+.mc{padding:13px}
+.mc .v{font-family:var(--mono);font-size:19px;font-weight:700}
+.spark{display:block;width:100%;height:34px;margin-top:6px}
+.grp{font-size:13px;color:var(--sub);font-weight:650;margin:18px 4px 8px}
+.prose{color:var(--sub);font-size:14px}.prose h3{color:var(--ink);font-size:15px;margin:16px 0 6px}.prose p{margin:6px 0}.prose ol,.prose ul{padding-left:20px;margin:6px 0}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:11.5px;color:var(--faint);font-weight:600}
+td.n,th.n{font-family:var(--mono);text-align:right;white-space:nowrap}
+th.n{font-family:inherit}
+.sheet{position:fixed;inset:0;z-index:20;display:none}.sheet.on{display:block}
+.sheet .bg{position:absolute;inset:0;background:rgba(0,0,0,.35)}
+.sheet .panel{position:absolute;left:0;right:0;bottom:0;top:calc(env(safe-area-inset-top) + 28px);background:var(--bg);border-radius:20px 20px 0 0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px calc(env(safe-area-inset-bottom) + 30px);animation:up .22s ease-out}
+@media (min-width:760px){.sheet .panel{left:50%;width:740px;margin-left:-370px;top:36px;bottom:36px;border-radius:20px}}
+@keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+.sh-head{position:sticky;top:0;background:var(--bg);padding:14px 0 10px;display:flex;justify-content:space-between;align-items:center;z-index:2;gap:10px}
+.close{border:0;background:var(--soft);color:var(--ink);font:inherit;font-weight:600;border-radius:99px;padding:6px 14px;flex:none}
+.sec{margin-top:12px}.sec h4{margin:0 0 8px;font-size:14.5px}
+.note{font-size:12.5px;background:var(--soft);border-radius:12px;padding:10px 12px;margin-top:8px;color:var(--sub)}
+.note.w{background:var(--warn-soft);color:var(--ink)}
+.bar{height:7px;border-radius:4px;display:inline-block;vertical-align:middle}
+.mini{display:inline-flex;background:var(--soft);border-radius:9px;padding:2px}
+.mini button{border:0;background:none;font:inherit;font-size:12px;padding:4px 10px;border-radius:7px;color:var(--sub)}
+.mini button.on{background:var(--card);color:var(--ink)}
+.timeline{display:flex;height:26px;border-radius:7px;overflow:hidden;margin:8px 0 4px}
+.timeline span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--sub)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}
+.err{padding:30px 10px;text-align:center;color:var(--sub)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>ETF 국면 전망<span id="demo"></span></h1><div class="meta" id="meta">불러오는 중…</div></header>
+  <div id="regime"></div>
+  <div class="seg" id="tabs"><button data-t="out" class="on">자산 전망</button><button data-t="mac">지표</button><button data-t="hist">국면·검증</button></div>
+  <main id="main"></main>
+</div>
+<div class="sheet" id="sheet"><div class="bg"></div><div class="panel" id="panel"></div></div>
+<script>
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+const S={d:null,tab:"out",hz:"1m"};
+const QC={"리플레이션":"var(--q1)","골디락스":"var(--q2)","스태그플레이션 위험":"var(--q3)","둔화·디스인플레이션":"var(--q4)"};
+const UP=["강한 상승","상승 우위"], DN=["강한 하락","하락 우위"];
+const fmt=(v,d=1)=>v==null||isNaN(v)?"–":Number(v).toLocaleString("ko-KR",{minimumFractionDigits:d,maximumFractionDigits:d});
+const sgn=(v,d=1)=>{if(v==null||isNaN(v))return"–";const r=Number(Number(v).toFixed(d));return(r>0?"+":"")+fmt(r===0?0:r,d)};
+const col=v=>v==null?"var(--faint)":v>0.05?"var(--up)":v<-0.05?"var(--dn)":"var(--mid)";
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pill=sig=>{const c=UP.includes(sig)?["var(--up)","var(--up-soft)"]:DN.includes(sig)?["var(--dn)","var(--dn-soft)"]:["var(--mid)","var(--soft)"];return`<span class="pill" style="color:${c[0]};background:${c[1]}">${sig}</span>`};
+const dimById=id=>S.d.regime.dims.find(x=>x.id===id);
+const comboTags=st=>st.dims.length?st.dims.map(x=>{const d=dimById(x.id);return`<span class="tag">${d.name} ${d.states[x.state]}</span>`}).join(""):`<span class="tag">뚜렷한 흐름 영향 없음 · 전체 기간 평균</span>`;
+const comboText=st=>st.dims.length?st.dims.map(x=>{const d=dimById(x.id);return`${d.name} ${d.states[x.state]}`}).join(" + "):"전체 기간 평균";
+
+async function load(){
+  try{const r=await fetch("data.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error(r.status);S.d=await r.json();render();}
+  catch(e){$("#main").innerHTML=`<div class="card err">data.json을 불러오지 못했습니다.<br><span class="tiny">GitHub Actions가 한 번 이상 실행됐는지 확인해 주세요. (${esc(e.message)})</span></div>`;$("#meta").textContent="";}
+}
+function render(){
+  const d=S.d,g=new Date(d.generated_at);
+  $("#meta").innerHTML=`${d.week} 주 기준<br>갱신 ${g.toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}`;
+  $("#demo").innerHTML=d.demo?`<span class="badge">데모 데이터</span>`:"";
+  renderRegime(); renderTab();
+}
+function renderTab(){({out:renderOutlook,mac:renderMacro,hist:renderHist})[S.tab]()}
+
+function renderRegime(){
+  const r=S.d.regime, story=r.story;
+  $("#regime").innerHTML=`<div class="card">
+    <div class="tiny">현재 국면</div>
+    <div class="quad"><i style="background:${QC[r.quad]||"var(--mid)"}"></i>${esc(r.quad||"판정 불가")}</div>
+    <ul class="story" id="story">${story.map((s,i)=>`<li class="${i>=4?"more":""}">${esc(s)}</li>`).join("")}</ul>
+    ${story.length>4?`<button class="linkbtn" id="moreBtn">해설 더 보기 ▾</button>`:""}
+    <div class="dims">${r.dims.map(x=>`<div class="dim" data-dim="${x.id}">
+      <div class="k">${esc(x.name)}</div>
+      <div class="s">${x.state==null?"–":esc(x.states[x.state])}</div>
+      <div class="a">${x.age?`${x.age}주째`:""}${x.flip_13w>=50?` · <b style="color:var(--warn)">13주 내 전환 ${fmt(x.flip_13w,0)}%</b>`:""}</div>
+      <div class="ev">${esc(x.evidence)}<br><span class="tiny">판정 기준: ${esc(x.desc)}${x.flip_4w!=null?` · 4주 내 전환 확률 ${fmt(x.flip_4w,0)}%, 13주 내 ${fmt(x.flip_13w,0)}%`:""}</span></div>
+    </div>`).join("")}</div>
+    <div class="tiny" style="margin-top:8px">흐름 칸을 누르면 근거 수치가 나옵니다.</div></div>`;
+  $$("[data-dim]").forEach(el=>el.onclick=()=>el.classList.toggle("open"));
+  const mb=$("#moreBtn"); if(mb) mb.onclick=()=>{$("#story").classList.toggle("open");mb.textContent=$("#story").classList.contains("open")?"접기 ▴":"해설 더 보기 ▾"};
+}
+
+function assetCard(a){
+  const st=a.h[S.hz]; if(!st) return "";
+  const w=(a.warnings||[]).find(x=>x.type==="down");
+  const low=a.rel.label==="낮음"||a.rel.label==="검증 불가";
+  return `<div class="card as ${low?"dimmed":""}" data-a="${a.id}">
+    <div class="top"><div><span class="nm">${esc(a.name)}</span><span class="cat">${esc(a.cat)}</span>
+      <div class="line2">상승확률 ${fmt(st.hit,0)}% · 범위 ${sgn(st.p25)}~${sgn(st.p75)}%</div><div class="tiny">신뢰도 ${a.rel.label}</div></div>
+      <div class="ret" style="color:${col(st.median)}">${sgn(st.median)}%<small>기대수익</small></div></div>
+    <div class="why">${comboTags(st)}<span class="tag" style="background:none;padding-left:2px">과거 ${st.episodes}개 시기</span></div>
+    <div class="etfs">${a.etfs.map(e=>`<span class="etf">${e}</span>`).join("")}${pill(st.signal)}</div>
+    ${w?`<div class="wline"><span>⚠</span><span>${esc(w.text)}</span></div>`:""}
+  </div>`;
+}
+function renderOutlook(){
+  const d=S.d, L=d.h_label;
+  const by=s=>d.assets.filter(a=>a.h[S.hz]&&s.includes(a.h[S.hz].signal));
+  const tier=a=>(a.rel.label==="높음"||a.rel.label==="보통")?1:0;
+  const key=a=>tier(a)*1000+a.h[S.hz].median;
+  const ups=by(UP).sort((a,b)=>key(b)-key(a)), dns=by(DN).sort((a,b)=>(tier(b)*1000-b.h[S.hz].median)-(tier(a)*1000-a.h[S.hz].median)), mids=by(["중립","데이터 부족"]);
+  $("#main").innerHTML=`
+    <div class="hz">${Object.entries(L).map(([k,v])=>`<button data-hz="${k}" class="${S.hz===k?"on":""}">${v}</button>`).join("")}</div>
+    <div class="sect"><h3>${L[S.hz]} 유망</h3><span>과거 같은 흐름 조합 기준</span></div>
+    <div class="list">${ups.map(assetCard).join("")||`<div class="small" style="padding:6px 4px">뚜렷하게 유리한 자산이 없습니다.</div>`}</div>
+    <div class="sect"><h3>${L[S.hz]} 주의 · 하락 우위</h3></div>
+    <div class="list">${dns.map(assetCard).join("")||`<div class="small" style="padding:6px 4px">뚜렷하게 불리한 자산이 없습니다.</div>`}</div>
+    <div class="sect"><h3>중립</h3><span>누르면 상세</span></div>
+    <div class="neutral">${mids.map(a=>`<button data-a="${a.id}">${esc(a.name)} <span class="tiny">${sgn(a.h[S.hz]?.median)}%</span></button>`).join("")}</div>
+    <p class="tiny" style="margin:16px 4px">기대수익은 현재와 같은 흐름 조합이었던 과거 주들에서 실제로 나온 ${L[S.hz]} 수익률의 가운데 값, 범위는 하위 25%~상위 25%입니다. 신뢰도 '낮음'은 과거 검증에서 이 방식의 예측력이 약했던 자산이라 흐리게 표시합니다.</p>`;
+  $$("[data-hz]").forEach(b=>b.onclick=()=>{S.hz=b.dataset.hz;renderOutlook()});
+  $$("[data-a]").forEach(el=>el.onclick=()=>openAsset(el.dataset.a));
+}
+
+function spark(hist,color="var(--ink)"){
+  const p=(hist||[]).filter(x=>x[1]!=null);if(p.length<2)return"";
+  const v=p.map(x=>x[1]),mn=Math.min(...v),mx=Math.max(...v),W=300,H=34;
+  const d=p.map((x,i)=>`${i?"L":"M"}${(i/(p.length-1)*W).toFixed(1)},${(H-3-(x[1]-mn)/((mx-mn)||1)*(H-6)).toFixed(1)}`).join("");
+  return`<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${d}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+}
+function renderMacro(){
+  const m=S.d.macro, cats=[...new Set(m.map(x=>x.cat))];
+  $("#main").innerHTML=cats.map(c=>`<div class="grp">${c}</div><div class="list">${m.filter(x=>x.cat===c).map(x=>`
+    <div class="card mc"><div style="display:flex;justify-content:space-between;gap:8px">
+      <div><div style="font-weight:650;font-size:14px">${esc(x.name)}</div><div class="tiny">${x.asof?`${/^\d{4}-/.test(x.asof)?"기준 ":""}${x.asof}`:""}${x.note?` · ${esc(x.note)}`:""}</div></div>
+      <div style="text-align:right"><div class="v">${fmt(x.value,x.dec)}<span class="tiny"> ${x.unit}</span></div>
+      ${x.chg13!=null?`<div class="tiny">13주 ${sgn(x.chg13,x.dec)}</div>`:""}</div></div>${spark(x.hist)}</div>`).join("")}</div>`).join("")
+    +`<p class="tiny" style="margin:14px 4px">출처: FRED(세인트루이스 연은), Atlanta Fed GDPNow, FactSet Earnings Insight, CNN, Caldara–Iacoviello GPR, Yahoo Finance.</p>`;
+}
+
+function renderHist(){
+  const d=S.d, runs=d.regime.runs, bt=d.backtest;
+  const t0=new Date(runs[0]?.[0]).getTime(), t1=new Date(runs.at(-1)?.[1]).getTime();
+  const years=[];for(let y=new Date(t0).getFullYear()+1;y<=new Date(t1).getFullYear();y++)if(y%5===0)years.push(y);
+  $("#main").innerHTML=`<div class="card"><h4 style="margin:0 0 4px">국면 이력 (성장 × 물가)</h4>
+    <div class="timeline">${runs.map(r=>{const a=new Date(r[0]).getTime(),b=new Date(r[1]).getTime()+6048e5;return`<span title="${r[2]} ${r[0]}~${r[1]}" style="width:${(b-a)/(t1+6048e5-t0)*100}%;background:${QC[r[2]]}"></span>`}).join("")}</div>
+    <div style="position:relative;height:14px">${years.map(y=>`<span class="tiny" style="position:absolute;left:${(new Date(y+"-01-01")-t0)/(t1-t0)*100}%;transform:translateX(-50%)">${y}</span>`).join("")}</div>
+    <div class="legend" style="margin-top:8px">${Object.entries(QC).map(([k,v])=>`<span><i style="background:${v}"></i>${k}</span>`).join("")}</div></div>
+    ${bt?`<div class="card sec"><h4>전략 검증 (표본 외, ${bt.since}~)</h4>
+      <p class="small" style="margin-top:0">매주 그 시점까지의 데이터만으로 '이번 달' 기대수익이 가장 높은 자산 3개(기대 &gt; 0)를 보유했을 때</p>
+      <table><tr><th></th><th class="n">연수익률</th><th class="n">최대낙폭</th></tr>
+      <tr><td>상위 3개 자산</td><td class="n">${sgn(bt.top3.cagr)}%</td><td class="n">${fmt(bt.top3.mdd)}%</td></tr>
+      <tr><td>전체 자산 균등</td><td class="n">${sgn(bt.ew.cagr)}%</td><td class="n">${fmt(bt.ew.mdd)}%</td></tr>
+      <tr><td>미국 대형주 보유</td><td class="n">${sgn(bt.spy.cagr)}%</td><td class="n">${fmt(bt.spy.mdd)}%</td></tr></table>
+      <p class="tiny">매주 교체 가정, 세금·수수료·현금 이자 미반영. 과거 성과는 미래를 보장하지 않습니다.</p></div>`:""}
+    <div class="card sec prose">
+      <h3>어떻게 판단하나</h3>
+      <ol>
+        <li><b>흐름 판정</b> — 성장·물가·국채금리·연준·달러·위험심리·기업이익·지정학 8가지를 매주 두 상태로 판정합니다(예: 물가 상승/하락). 발표 지연을 반영해 그 시점에 실제로 알 수 있던 값만 씁니다.</li>
+        <li><b>자산별로 중요한 흐름 선택</b> — 각 자산마다 어떤 흐름이 과거 이후 수익률을 실제로 갈랐는지 통계(t값)로 측정해, 영향이 큰 흐름만 강한 순서대로 씁니다. 예: 장기채는 금리·성장, 금은 달러·금리.</li>
+        <li><b>같은 조합 찾기</b> — 현재와 같은 흐름 조합이었던 과거 주들을 찾아 이후 1주·1개월·1분기 수익률의 중앙값, 범위, 상승확률을 냅니다. 표본이 52주 미만이거나 서로 다른 시기가 3개 미만이면 영향이 가장 약한 흐름부터 빼서 넓힙니다.</li>
+        <li><b>하락 전환 경고</b> — 각 흐름이 기준선에 얼마나 가까운지로 13주 내 바뀔 확률을 과거 사례에서 구하고, 바뀌면 자산 전망이 어떻게 달라지는지 다시 계산합니다.</li>
+        <li><b>검증</b> — 2000년부터 매주 그때까지의 데이터만으로 같은 계산을 반복해 실제로 맞았는지 측정합니다(신뢰도).</li>
+      </ol>
+      <h3>한계</h3>
+      <ul><li>같은 국면이라도 결과의 폭이 넓습니다. 중앙값과 함께 범위·상승확률을 꼭 보세요.</li>
+      <li>점도표·애널리스트 이익 예상은 과거 시점 값이 없어 해설과 지표에만 쓰고, 통계에는 시장금리·실제 기업이익을 씁니다.</li>
+      <li>비트코인·이더리움, 상장 기간이 짧은 ETF는 표본이 적어 신뢰도가 낮습니다. 상장 전 기간은 지수·금리로 대신 계산합니다.</li></ul>
+      <p class="tiny">투자 판단의 참고 자료이며 투자 권유가 아닙니다.</p></div>`;
+}
+
+function chart(hist){
+  const p=(hist||[]).filter(x=>x[1]!=null);if(p.length<5)return"";
+  const W=680,H=150,v=p.map(x=>x[1]),mn=Math.min(...v),mx=Math.max(...v);
+  const x=i=>i/(p.length-1)*W,y=val=>6+(1-(val-mn)/((mx-mn)||1))*(H-24);
+  const d=p.map((q,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(q[1]).toFixed(1)}`).join("");
+  const yrs=[];let last=null;p.forEach((q,i)=>{const yy=q[0].slice(0,4);if(yy!==last){if(last)yrs.push([i,yy]);last=yy}});
+  return`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${yrs.map(([i,yy])=>`<line x1="${x(i)}" x2="${x(i)}" y1="0" y2="${H-14}" stroke="var(--line)"/><text x="${x(i)+3}" y="${H-2}" font-size="11" fill="var(--faint)">${yy}</text>`).join("")}
+    <path d="${d}" fill="none" stroke="var(--ink)" stroke-width="1.7" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
+function openAsset(id){
+  const d=S.d,a=d.assets.find(x=>x.id===id),L=d.h_label;let hz=S.hz;
+  const draw=()=>{
+    const st=a.h[hz], drv=(a.drivers||[]).filter(x=>Math.abs(x.t)>=1), mx=Math.max(1,...drv.map(x=>Math.abs(x.t)));
+    $("#panel").innerHTML=`
+    <div class="sh-head"><div><div style="font-size:21px;font-weight:750">${esc(a.name)}</div>
+      <div class="small">${a.price!=null?`${a.price_sym} $${fmt(a.price,2)} (${a.price_date}) · 1주 ${sgn(a.chg1w)}%`:""}</div></div><button class="close" id="cl">닫기</button></div>
+    <div class="card"><div class="small" style="margin-bottom:6px">관련 ETF</div><div class="etfs" style="margin-top:0">${a.etfs.map(e=>`<span class="etf">${e}</span>`).join("")}</div>
+      <table style="margin-top:10px"><tr><th>기간</th><th class="n">기대</th><th class="n">범위</th><th class="n">상승확률</th><th class="n">평소 대비</th></tr>
+      ${Object.keys(L).map(k=>{const s=a.h[k];return s?`<tr><td>${L[k]}<div>${pill(s.signal)}</div></td><td class="n" style="color:${col(s.median)};font-weight:700">${sgn(s.median)}%</td><td class="n">${sgn(s.p25)}~${sgn(s.p75)}</td><td class="n">${fmt(s.hit,0)}%</td><td class="n">${sgn(s.mean-s.base_mean)}%p</td></tr>`:`<tr><td>${L[k]}</td><td colspan="4" class="tiny">데이터 부족</td></tr>`}).join("")}</table>
+      <p class="tiny" style="margin:6px 0 0">평소 대비 = 같은 조합일 때 평균 − 전체 기간 평균</p></div>
+    ${(a.warnings||[]).length?`<div class="card sec"><h4>전환 경고</h4>${a.warnings.map(w=>`<div class="note ${w.type==="down"?"w":""}">${w.type==="down"?"⚠ ":"↗ "}${esc(w.text)}</div>`).join("")}</div>`:""}
+    <div class="card sec"><div style="display:flex;justify-content:space-between;align-items:center"><h4 style="margin:0">판단 근거</h4>
+      <div class="mini">${Object.entries(L).map(([k,v])=>`<button data-h="${k}" class="${hz===k?"on":""}">${v.replace("이번 ","")}</button>`).join("")}</div></div>
+      ${st?`<p style="margin:10px 0 6px;font-size:14.5px">지금과 같은 <b>${esc(comboText(st))}</b> 조합이 나타났던 과거 <b>${st.episodes}개 시기(${st.n}주)</b>에 이 자산의 ${L[hz]} 수익률은 중앙값 <b style="color:${col(st.median)}">${sgn(st.median)}%</b>, 오른 비율 ${fmt(st.hit,0)}%였습니다.</p>
+      <table><tr><th>과거 시기</th><th class="n">주</th><th class="n">평균 ${L[hz].replace("이번 ","")} 수익</th></tr>
+      ${st.eps.map(e=>`<tr><td>${e.start.slice(0,7)} ~ ${e.end.slice(0,7)}</td><td class="n">${e.weeks}</td><td class="n" style="color:${col(e.avg)}">${sgn(e.avg)}%</td></tr>`).join("")}</table>
+      <p class="tiny">최근 8개 시기만 표시 · 시기별로 결과가 엇갈리면 확신을 낮추세요 (오른 시기 비율 ${fmt(st.ep_pos,0)}%).</p>`:`<p class="small">데이터 부족</p>`}</div>
+    <div class="card sec"><h4>이 자산을 움직이는 흐름 (분기 기준)</h4>
+      ${drv.length?`<table>${drv.map(x=>`<tr><td>${esc(x.name)}<div class="tiny">${esc(x.states[0])}일 때 ${sgn(x.mean0)}% · ${esc(x.states[1])}일 때 ${sgn(x.mean1)}%</div></td>
+        <td style="width:40%"><span class="bar" style="width:${Math.abs(x.t)/mx*100}%;background:${x.t>0?"var(--up)":"var(--dn)"}"></span></td></tr>`).join("")}</table>
+        <p class="tiny">막대 길이 = 통계적 영향력(t값). 빨강은 앞 상태(${esc(drv[0].states[0])} 등)일 때 유리, 파랑은 뒤 상태일 때 유리.</p>`
+        :`<p class="small">통계적으로 뚜렷한 영향을 주는 흐름이 없습니다. 거시 흐름으로 방향을 판단하기 어려운 자산입니다.</p>`}</div>
+    ${(a.scenarios||[]).length?`<div class="card sec"><h4>흐름이 바뀌면</h4><table><tr><th>바뀌는 흐름</th><th class="n">13주 내 확률</th><th class="n">이번 달</th><th class="n">이번 분기</th></tr>
+      ${a.scenarios.map(s=>{const dn=dimById(s.dim);return`<tr><td>${esc(dn.name)} → ${esc(s.to)}</td><td class="n">${fmt(s.prob,0)}%</td><td class="n" style="color:${col(s["1m"]?.median)}">${s["1m"]?sgn(s["1m"].median)+"%":"영향 없음"}</td><td class="n" style="color:${col(s["1q"]?.median)}">${s["1q"]?sgn(s["1q"].median)+"%":"영향 없음"}</td></tr>`}).join("")}</table></div>`:""}
+    <div class="card sec"><h4>신뢰도: ${a.rel.label}</h4><p class="small" style="margin:0">${a.rel.since||""}부터 매주 그때까지의 데이터로만 예측했을 때 — 예측과 실제의 순위상관 이번 달 ${sgn(a.rel["1m"],2)}, 이번 분기 ${sgn(a.rel["1q"],2)} · 방향 적중률 이번 달 ${fmt(a.rel["1m_hit"],0)}%, 이번 분기 ${fmt(a.rel["1q_hit"],0)}%</p></div>
+    <div class="card sec"><h4>최근 3년 가격</h4>${chart(a.hist)}</div>`;
+    $("#cl").onclick=closeSheet;
+    $$("[data-h]").forEach(b=>b.onclick=()=>{hz=b.dataset.h;draw()});
+  };
+  draw();$("#sheet").classList.add("on");document.body.style.overflow="hidden";$("#panel").scrollTop=0;
+}
+function closeSheet(){$("#sheet").classList.remove("on");document.body.style.overflow=""}
+$("#sheet .bg").onclick=closeSheet;
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheet()});
+$$("#tabs button").forEach(b=>b.onclick=()=>{S.tab=b.dataset.t;$$("#tabs button").forEach(x=>x.classList.toggle("on",x===b));renderTab()});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.d&&(Date.now()-new Date(S.d.generated_at))/3.6e6>6)load()});
+load();
+</script>
+</body>
+</html>
