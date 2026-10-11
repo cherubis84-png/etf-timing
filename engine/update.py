@@ -79,7 +79,6 @@ def collect():
     fetch.log("▶ 거시 지표 수집")
     with ThreadPoolExecutor(6) as ex:
         raw = dict(zip(FRED_IDS, ex.map(fetch.fred, FRED_IDS)))
-    raw["DXY"] = fetch.price("DX-Y.NYB")
     raw["GPRD"] = fetch.gpr_daily()
     raw["FEARGREED"] = fetch.cnn_fear_greed()
     fs = fetch.factset()
@@ -89,8 +88,8 @@ def collect():
         for src in a["src"]:
             if src[0] == "yahoo" and src[1] not in syms:
                 syms.append(src[1])
-    with ThreadPoolExecutor(6) as ex:
-        px = dict(zip(syms, ex.map(fetch.price, syms)))
+    px = fetch.prices(syms)
+    raw["DXY"] = px.get("DX-Y.NYB")
     return raw, px, fs
 
 
@@ -401,9 +400,10 @@ def macro_cards(W, raw, fed, fs):
 # ═════════════════════ 실행 ═════════════════════
 def main():
     raw, px, fs = collect()
-    ref = px.get("SPY") if px.get("SPY") is not None else px.get("^GSPC")
+    ref = next((px[k] for k in ("SPY", "^GSPC", "QQQ", "^NDX") if px.get(k) is not None),
+               next((v for v in px.values() if v is not None), None))
     if ref is None:
-        fetch.log("✗ 가격 데이터를 하나도 받지 못해 중단합니다 (이전 data.json 유지). Yahoo·Stooq 접속이 막혔는지 확인하세요.")
+        fetch.log("✗ 가격 데이터를 하나도 받지 못해 중단합니다 (이전 data.json 유지). Yahoo 접속이 막혔는지 확인하세요.")
         sys.exit(1)
     end = R.to_weekly(ref).index[-1]
     grid = pd.date_range(pd.Timestamp(START), end, freq="W-FRI")

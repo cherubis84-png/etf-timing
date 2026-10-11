@@ -140,8 +140,12 @@ def gpr_daily():
 # ── CNN 공포·탐욕 (비공식 엔드포인트, 실패 가능) ───────────────
 def cnn_fear_greed():
     def go():
-        r = _get("https://production.dataviz.cnn.io/index/fearandgreed/graphdata/2018-01-01",
-                 headers={"Referer": "https://edition.cnn.com/", "Origin": "https://edition.cnn.com"})
+        h = {"Referer": "https://edition.cnn.com/", "Origin": "https://edition.cnn.com", "Accept": "application/json"}
+        try:
+            r = _get("https://production.dataviz.cnn.io/index/fearandgreed/graphdata", headers=h)
+        except Exception:  # noqa: BLE001
+            r = _get("https://production.dataviz.cnn.io/index/fearandgreed/graphdata/"
+                     + (pd.Timestamp.today() - pd.Timedelta(days=365)).strftime("%Y-%m-%d"), headers=h)
         pts = r.json()["fear_and_greed_historical"]["data"]
         s = pd.Series({pd.Timestamp(p["x"], unit="ms").normalize(): float(p["y"]) for p in pts})
         return s
@@ -159,13 +163,15 @@ def factset():
     today = pd.Timestamp.today().normalize()
     try:
         from pypdf import PdfReader
+        last_err = ""
         for back in range(0, 22):
             d = today - pd.Timedelta(days=back)
             if d.weekday() not in (3, 4):          # 보통 금요일(휴일 전엔 목요일) 발행
                 continue
             try:
                 r = _get(base.format(d.strftime("%m%d%y")), tries=1)
-            except Exception:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001
+                last_err = str(e)[-60:]
                 continue
             text = " ".join((p.extract_text() or "") for p in PdfReader(io.BytesIO(r.content)).pages[:6])
             text = re.sub(r"\s+", " ", text)
@@ -183,7 +189,7 @@ def factset():
                     json.dump(out, f, ensure_ascii=False)
                 log(f"  ✓ FactSet 실적 예상 {out['date']}: {out['growth']}")
                 return out
-        raise RuntimeError("최근 3주 보고서를 찾지 못함")
+        raise RuntimeError(f"최근 3주 보고서를 받지 못함 — 마지막 오류: {last_err}")
     except Exception as e:  # noqa: BLE001
         if os.path.exists(path):
             log(f"  ⚠ FactSet: 수집 실패 → 직전 값 사용 ({e})")
@@ -192,36 +198,75 @@ def factset():
         return None
 
 
-# ── 가격 (Yahoo → Stooq 백업), 배당 반영 수정주가 ───────────────
-def price(symbol):
-    def yahoo():
-        now = int(datetime.now(timezone.utc).timestamp())
-        r = _get(f"https://query2.finance.yahoo.com/v8/finance/chart/{symbol}",
-                 params={"period1": 0, "period2": now, "interval": "1d", "events": "div,split"})
-        res = r.json()["chart"]["result"][0]
-        ts = pd.to_datetime(res["timestamp"], unit="s").normalize()
-        ind = res["indicators"]
-        vals = ind.get("adjclose", [{}])[0].get("adjclose") or ind["quote"][0]["close"]
-        return pd.Series(vals, index=ts, dtype="float64")
+# ── 가격 ─────────────────────────────────────────────────────
+# 1순위 yfinance(브라우저 흉내로 Yahoo 차단을 피함, 여러 종목 한 번에)
+# 2순위 Yahoo 직접 호출(천천히 하나씩)
+# 3순위 FRED에 있는 대체 시계열(지수·원유·달러·코인)
+# 그래도 없으면 data/cache 의 직전 값
+FRED_PROXY = {"^GSPC": "SP500", "^NDX": "NASDAQ100", "CL=F": "DCOILWTICO",
+              "DX-Y.NYB": "DTWEXBGS", "BTC-USD": "CBBTCUSD", "ETH-USD": "CBETHUSD"}
 
-    def stooq():
-        special = {"^GSPC": "^spx", "^NDX": "^ndx", "^RUT": "^rut", "^SOX": "^sox", "DX-Y.NYB": "dx.f",
-                   "GC=F": "gc.f", "SI=F": "si.f", "CL=F": "cl.f"}
-        if symbol in special:
-            code = special[symbol]
-        elif symbol.endswith("-USD"):
-            code = symbol.lower().replace("-usd", "usd")
-        else:
-            code = symbol.lower() + ".us"
-        r = _get(f"https://stooq.com/q/d/l/?s={code}&i=d")
-        df = pd.read_csv(io.StringIO(r.text))
-        return pd.Series(df["Close"].values, index=pd.to_datetime(df["Date"]))
 
-    def go():
+def _yf_batch(symbols):
+    out = {}
+    try:
+        import yfinance as yf
+    except Exception as e:  # noqa: BLE001
+        log(f"    yfinance 사용 불가: {e}")
+        return out
+    for i in range(0, len(symbols), 8):
+        chunk = symbols[i:i + 8]
         try:
-            return yahoo()
+            df = yf.download(chunk, period="max", interval="1d", auto_adjust=True,
+                             progress=False, threads=False, group_by="column")
+            close = df["Close"] if "Close" in df else df
+            if isinstance(close, pd.Series):
+                close = close.to_frame(chunk[0])
+            for sym in chunk:
+                if sym in close.columns:
+                    ser = pd.to_numeric(close[sym], errors="coerce").dropna()
+                    if len(ser) > 30:
+                        ser.index = pd.DatetimeIndex(ser.index).tz_localize(None).normalize()
+                        out[sym] = ser
         except Exception as e:  # noqa: BLE001
-            log(f"    Yahoo 실패({symbol}): {e} → Stooq 시도")
-            return stooq()
+            log(f"    yfinance 실패({','.join(chunk)}): {str(e)[:100]}")
+        time.sleep(2)
+    return out
 
-    return cached(f"px_{symbol}", go)
+
+def _yahoo_one(symbol):
+    now = int(datetime.now(timezone.utc).timestamp())
+    r = _get(f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+             params={"period1": 0, "period2": now, "interval": "1d", "events": "div,split"})
+    res = r.json()["chart"]["result"][0]
+    ts = pd.to_datetime(res["timestamp"], unit="s").normalize()
+    ind = res["indicators"]
+    vals = ind.get("adjclose", [{}])[0].get("adjclose") or ind["quote"][0]["close"]
+    return pd.Series(vals, index=ts, dtype="float64")
+
+
+def prices(symbols):
+    """여러 종목 가격을 한 번에. 반환 {종목: 일별 종가 Series 또는 None}"""
+    got = _yf_batch(list(symbols))
+    log(f"  yfinance: {len(got)}/{len(symbols)}개 성공")
+    result = {}
+    for sym in symbols:
+        def go(sym=sym):
+            if sym in got:
+                return got[sym]
+            try:
+                time.sleep(1.0)
+                return _yahoo_one(sym)
+            except Exception as e:  # noqa: BLE001
+                if sym in FRED_PROXY:
+                    log(f"    {sym}: Yahoo 실패 → FRED {FRED_PROXY[sym]} 로 대체")
+                    s = fred(FRED_PROXY[sym])
+                    if s is not None and len(s.dropna()) > 30:
+                        return s.dropna()
+                raise e
+        result[sym] = cached(f"px_{sym}", go)
+    return result
+
+
+def price(symbol):
+    return prices([symbol])[symbol]
