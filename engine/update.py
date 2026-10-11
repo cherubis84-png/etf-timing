@@ -73,18 +73,24 @@ def collect():
     if DEMO:
         import demo_data
         return demo_data.make()
+    from concurrent.futures import ThreadPoolExecutor
+    if not os.environ.get("FRED_API_KEY", "").strip():
+        fetch.log("⚠ FRED_API_KEY가 없습니다. GitHub 서버에서는 FRED 웹 CSV가 자주 막히니 키를 등록하세요.")
     fetch.log("▶ 거시 지표 수집")
-    raw = {k: fetch.fred(k) for k in FRED_IDS}
+    with ThreadPoolExecutor(6) as ex:
+        raw = dict(zip(FRED_IDS, ex.map(fetch.fred, FRED_IDS)))
     raw["DXY"] = fetch.price("DX-Y.NYB")
     raw["GPRD"] = fetch.gpr_daily()
     raw["FEARGREED"] = fetch.cnn_fear_greed()
     fs = fetch.factset()
     fetch.log("▶ 가격 수집")
-    px = {}
+    syms = []
     for a in ASSETS:
         for src in a["src"]:
-            if src[0] == "yahoo" and src[1] not in px:
-                px[src[1]] = fetch.price(src[1])
+            if src[0] == "yahoo" and src[1] not in syms:
+                syms.append(src[1])
+    with ThreadPoolExecutor(6) as ex:
+        px = dict(zip(syms, ex.map(fetch.price, syms)))
     return raw, px, fs
 
 
@@ -396,6 +402,9 @@ def macro_cards(W, raw, fed, fs):
 def main():
     raw, px, fs = collect()
     ref = px.get("SPY") if px.get("SPY") is not None else px.get("^GSPC")
+    if ref is None:
+        fetch.log("✗ 가격 데이터를 하나도 받지 못해 중단합니다 (이전 data.json 유지). Yahoo·Stooq 접속이 막혔는지 확인하세요.")
+        sys.exit(1)
     end = R.to_weekly(ref).index[-1]
     grid = pd.date_range(pd.Timestamp(START), end, freq="W-FRI")
 

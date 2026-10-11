@@ -20,18 +20,30 @@ def log(msg):
     LOG.append(msg)
 
 
-def _get(url, tries=3, **kw):
+_FAILS = {}          # 호스트별 연속 실패 횟수 — 막힌 사이트는 빨리 건너뛰기
+
+
+def _get(url, tries=2, **kw):
+    from urllib.parse import urlparse
+    host = urlparse(url).netloc
+    if _FAILS.get(host, 0) >= 6:
+        raise RuntimeError(f"{host} 연속 실패로 건너뜀")
+    extra = kw.pop("headers", {})
     last = None
     for i in range(tries):
         try:
-            r = requests.get(url, headers={**UA, **kw.pop("headers", {})}, timeout=40, **kw)
+            r = requests.get(url, headers={**UA, **extra}, timeout=(8, 25), **kw)
             if r.status_code == 200:
+                _FAILS[host] = 0
                 return r
             last = f"HTTP {r.status_code}"
+            if r.status_code in (401, 403, 404):
+                break
         except Exception as e:  # noqa: BLE001
-            last = str(e)
-        time.sleep(2 * (i + 1))
-    raise RuntimeError(f"{url} 실패: {last}")
+            last = str(e)[:120]
+        time.sleep(1.5 * (i + 1))
+    _FAILS[host] = _FAILS.get(host, 0) + 1
+    raise RuntimeError(f"{url[:80]} 실패: {last}")
 
 
 def _cache_path(key):
@@ -73,19 +85,27 @@ def cached(key, fn, merge=False):
 
 # ── FRED ─────────────────────────────────────────────────────
 def fred(series_id):
+    """FRED 공식 API(키 필요)를 먼저 쓰고, 안 되면 웹 CSV로. GitHub 서버에선 웹 CSV가 자주 막힘."""
     key = os.environ.get("FRED_API_KEY", "").strip()
+
+    def via_api():
+        r = _get("https://api.stlouisfed.org/fred/series/observations",
+                 params={"series_id": series_id, "api_key": key, "file_type": "json"})
+        obs = r.json()["observations"]
+        return pd.Series({pd.Timestamp(o["date"]): o["value"] for o in obs})
+
+    def via_csv():
+        r = _get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}", tries=1)
+        df = pd.read_csv(io.StringIO(r.text))
+        return pd.Series(df.iloc[:, 1].values, index=pd.to_datetime(df.iloc[:, 0]))
 
     def go():
         if key:
-            r = _get("https://api.stlouisfed.org/fred/series/observations",
-                     params={"series_id": series_id, "api_key": key, "file_type": "json"})
-            obs = r.json()["observations"]
-            s = pd.Series({pd.Timestamp(o["date"]): o["value"] for o in obs})
-        else:
-            r = _get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}")
-            df = pd.read_csv(io.StringIO(r.text))
-            s = pd.Series(df.iloc[:, 1].values, index=pd.to_datetime(df.iloc[:, 0]))
-        return pd.to_numeric(s, errors="coerce")
+            try:
+                return pd.to_numeric(via_api(), errors="coerce")
+            except Exception as e:  # noqa: BLE001
+                log(f"    FRED API 실패({series_id}): {e} → 웹 CSV 시도")
+        return pd.to_numeric(via_csv(), errors="coerce")
 
     return cached(f"fred_{series_id}", go)
 
@@ -187,9 +207,12 @@ def price(symbol):
     def stooq():
         special = {"^GSPC": "^spx", "^NDX": "^ndx", "^RUT": "^rut", "^SOX": "^sox", "DX-Y.NYB": "dx.f",
                    "GC=F": "gc.f", "SI=F": "si.f", "CL=F": "cl.f"}
-        code = special.get(symbol) or symbol.lower().replace("-usd", "usd")
-        if code == symbol.lower() and not code.endswith("usd"):
-            code += ".us"
+        if symbol in special:
+            code = special[symbol]
+        elif symbol.endswith("-USD"):
+            code = symbol.lower().replace("-usd", "usd")
+        else:
+            code = symbol.lower() + ".us"
         r = _get(f"https://stooq.com/q/d/l/?s={code}&i=d")
         df = pd.read_csv(io.StringIO(r.text))
         return pd.Series(df["Close"].values, index=pd.to_datetime(df["Date"]))
