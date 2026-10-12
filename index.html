@@ -51,7 +51,7 @@ h1{font-size:25px;letter-spacing:-.02em;margin:0;font-weight:750}
 .dim .ev{display:none;font-size:12.5px;color:var(--sub);margin-top:6px;line-height:1.55}
 .dim.open .ev{display:block}
 .seg{display:flex;background:var(--soft);border-radius:12px;padding:3px;margin:16px 0 12px;position:sticky;top:calc(env(safe-area-inset-top) + 4px);z-index:5}
-.seg button{flex:1;border:0;background:transparent;color:var(--sub);font:inherit;font-weight:600;padding:8px 0;border-radius:9px}
+.seg button{flex:1;border:0;background:transparent;color:var(--sub);font:inherit;font-size:14px;font-weight:600;padding:8px 0;border-radius:9px;white-space:nowrap}
 .seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .hz{display:flex;gap:6px;margin-bottom:12px}
 .hz button{flex:1;border:1px solid var(--line);background:var(--card);color:var(--sub);font:inherit;font-size:14px;font-weight:600;padding:9px 0;border-radius:12px}
@@ -114,13 +114,13 @@ th.n{font-family:inherit}
 <div class="wrap">
   <header><h1>ETF 국면 전망<span id="demo"></span></h1><div class="meta" id="meta">불러오는 중…</div></header>
   <div id="regime"></div>
-  <div class="seg" id="tabs"><button data-t="out" class="on">자산 전망</button><button data-t="mac">지표</button><button data-t="hist">국면·검증</button></div>
+  <div class="seg" id="tabs"><button data-t="out" class="on">자산 전망</button><button data-t="trk">적중 기록</button><button data-t="mac">지표</button><button data-t="hist">국면·검증</button></div>
   <main id="main"></main>
 </div>
 <div class="sheet" id="sheet"><div class="bg"></div><div class="panel" id="panel"></div></div>
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-const S={d:null,tab:"out",hz:"1m"};
+const S={d:null,tab:"out",hz:"1m",tk:null,tkHz:"1m"};
 const QC={"리플레이션":"var(--q1)","골디락스":"var(--q2)","스태그플레이션 위험":"var(--q3)","둔화·디스인플레이션":"var(--q4)"};
 const UP=["강한 상승","상승 우위"], DN=["강한 하락","하락 우위"];
 const fmt=(v,d=1)=>v==null||isNaN(v)?"–":Number(v).toLocaleString("ko-KR",{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -142,7 +142,76 @@ function render(){
   $("#demo").innerHTML=d.demo?`<span class="badge">데모 데이터</span>`:"";
   renderRegime(); renderTab();
 }
-function renderTab(){({out:renderOutlook,mac:renderMacro,hist:renderHist})[S.tab]()}
+function renderTab(){({out:renderOutlook,trk:renderTrack,mac:renderMacro,hist:renderHist})[S.tab]()}
+async function loadTrack(){
+  if(S.tk) return S.tk;
+  try{const r=await fetch("data/cache/track.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)throw 0;S.tk=await r.json();}catch(e){S.tk={missing:true};}
+  return S.tk;
+}
+const fmtDay=d=>d?d.slice(5).replace("-","/"):"";
+const okMark=(m,a)=>a==null?"":(Math.abs(m)<=0.05?`<span class="tiny">–</span>`:(Math.sign(m)===Math.sign(a)?`<b style="color:var(--q2)">✓</b>`:`<b style="color:var(--dn)">✗</b>`));
+function statTiles(s,label){
+  if(!s) return `<p class="small">${label}: 아직 결과가 확정된 전망이 없습니다.</p>`;
+  const tile=(k,v,sub)=>`<div class="mc card" style="padding:11px"><div class="tiny">${k}</div><div class="v" style="font-size:18px">${v}</div>${sub?`<div class="tiny">${sub}</div>`:""}</div>`;
+  return `<div class="list" style="grid-template-columns:1fr 1fr">
+    ${tile("방향 적중률",fmt(s.dir_hit,0)+"%",`오르/내림을 맞힌 비율 · ${s.n}건`)}
+    ${tile("범위 적중률",fmt(s.band_hit,0)+"%","예상 범위 안에 든 비율 (50% 근처면 정상)")}
+    ${tile("평균 오차",fmt(s.mae,1)+"%p",`실제 − 예상 평균 ${sgn(s.bias,1)}%p`)}
+    ${tile("신호별 실제 결과",`<span style="color:var(--up)">${s.up_avg==null?"–":sgn(s.up_avg,1)+"%"}</span> / <span style="color:var(--dn)">${s.dn_avg==null?"–":sgn(s.dn_avg,1)+"%"}</span>`,`상승 우위일 때 / 하락 우위일 때 실제 평균`)}
+  </div>`;
+}
+async function renderTrack(){
+  $("#main").innerHTML=`<div class="small" style="padding:10px 4px">불러오는 중…</div>`;
+  const tk=await loadTrack(); if(S.tab!=="trk") return;
+  if(tk.missing||!tk.summary){$("#main").innerHTML=`<div class="card small">적중 기록 파일(data/cache/track.json)이 아직 없습니다. 다음 자동 갱신 후 표시됩니다.</div>`;return;}
+  const L=S.d.h_label, hz=S.tkHz, sm=tk.summary[hz]||{}, nm=tk.names||{};
+  const live=(tk.live||[]).filter(e=>e.hk===hz);
+  const done=live.filter(e=>e.actual!=null).sort((a,b)=>b.week.localeCompare(a.week));
+  const wait=live.filter(e=>e.actual==null);
+  const lastWk=wait.length?wait.map(e=>e.week).sort().at(-1):null;
+  const waitNow=wait.filter(e=>e.week===lastWk).sort((a,b)=>b.median-a.median);
+  const per=Object.entries(sm.per_asset||{}).sort((a,b)=>b[1].dir_hit-a[1].dir_hit);
+  $("#main").innerHTML=`
+    <div class="hz">${Object.entries(L).map(([k,v])=>`<button data-tz="${k}" class="${hz===k?"on":""}">${v}</button>`).join("")}</div>
+    <div class="card"><h4 style="margin:0 0 4px">실제 기록</h4>
+      <p class="tiny" style="margin:0 0 10px">앱이 매주 보여준 전망을 저장해 두었다가 ${L[hz].replace("이번 ","")}이 지나면 실제 수익률과 맞춰 봅니다.</p>
+      ${statTiles(sm.live,"실제 기록")}
+      ${done.length?`<table style="margin-top:10px"><tr><th>전망한 주</th><th>자산</th><th class="n">예상</th><th class="n">실제</th><th class="n">차이</th><th></th></tr>
+        ${done.slice(0,30).map(e=>`<tr><td>${fmtDay(e.week)}</td><td>${esc(nm[e.asset]||e.asset)}</td><td class="n">${sgn(e.median)}%</td><td class="n" style="color:${col(e.actual)}">${sgn(e.actual)}%</td><td class="n">${sgn(e.actual-e.median)}</td><td>${okMark(e.median,e.actual)}</td></tr>`).join("")}</table>`:""}
+      ${waitNow.length?`<div class="sec"><div class="small" style="margin-bottom:4px">결과 대기 중 — ${fmtDay(lastWk)} 전망, ${fmtDay(waitNow[0].due)} 확정</div>
+        <div class="neutral">${waitNow.map(e=>`<button>${esc(nm[e.asset]||e.asset)} <span class="tiny" style="color:${col(e.median)}">${sgn(e.median)}%</span></button>`).join("")}</div></div>`:""}
+    </div>
+    <div class="card sec"><h4 style="margin:0 0 4px">과거 재현 (최근 ${hz==="1w"?"1년":hz==="1m"?"2년":"3년"})</h4>
+      <p class="tiny" style="margin:0 0 10px">과거 매주, 그 시점까지의 데이터만으로 앱과 똑같이 계산한 전망을 실제 결과와 비교했습니다. 경제지표는 나중에 수정된 값 기준이라 당시 숫자와 조금 다를 수 있습니다.</p>
+      ${statTiles(sm.replay,"과거 재현")}
+      ${per.length?`<table style="margin-top:10px"><tr><th>자산</th><th class="n">건수</th><th class="n">방향 적중</th><th class="n">범위 적중</th><th class="n">평균 오차</th></tr>
+        ${per.map(([id,v])=>`<tr data-a="${id}" style="cursor:pointer"><td>${esc(nm[id]||id)}</td><td class="n">${v.n}</td><td class="n" style="color:${v.dir_hit>=55?"var(--q2)":v.dir_hit<45?"var(--dn)":"inherit"}">${fmt(v.dir_hit,0)}%</td><td class="n">${fmt(v.band_hit,0)}%</td><td class="n">${fmt(v.mae,1)}%p</td></tr>`).join("")}</table>
+        <p class="tiny">자산을 누르면 전망과 실제를 그래프로 볼 수 있습니다. 방향 적중 55% 이상 초록, 45% 미만 파랑.</p>`:""}
+    </div>
+    <div class="card sec prose"><h3 style="margin-top:0">숫자 읽는 법</h3>
+      <ul><li><b>방향 적중률</b>: 예상이 +면 실제로 올랐는지, −면 내렸는지. 50%가 동전 던지기 수준입니다.</li>
+      <li><b>범위 적중률</b>: 실제 수익이 예상 범위(하위 25%~상위 25%) 안에 든 비율. 50% 근처면 범위를 정직하게 잡은 것이고, 많이 낮으면 범위가 너무 좁은 것입니다.</li>
+      <li><b>평균 오차</b>: 예상 중앙값과 실제의 차이 평균. 기간이 길수록 커지는 게 정상입니다.</li>
+      <li><b>신호별 실제 결과</b>: '상승 우위'라고 했을 때 실제 평균이 '하락 우위'라고 했을 때보다 높아야 신호가 쓸모 있다는 뜻입니다.</li></ul></div>`;
+  $$("[data-tz]").forEach(b=>b.onclick=()=>{S.tkHz=b.dataset.tz;renderTrack()});
+  $$("#main [data-a]").forEach(el=>el.onclick=()=>openAsset(el.dataset.a));
+}
+function trackChart(rows){
+  rows=(rows||[]).filter(r=>r[4]!=null); if(rows.length<4) return "";
+  const W=680,H=170,n=rows.length, vals=rows.flatMap(r=>[r[2],r[3],r[4]]);
+  let mn=Math.min(...vals),mx=Math.max(...vals); const pad=(mx-mn)*.06||1; mn-=pad; mx+=pad;
+  const x=i=>i/(n-1)*W, y=v=>6+(1-(v-mn)/(mx-mn))*(H-24);
+  const band=rows.map((r,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(r[3]).toFixed(1)}`).join("")+rows.slice().reverse().map((r,j)=>`L${x(n-1-j).toFixed(1)},${y(r[2]).toFixed(1)}`).join("")+"Z";
+  const med=rows.map((r,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(r[1]).toFixed(1)}`).join("");
+  const dots=rows.map((r,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(r[4]).toFixed(1)}" r="2.4" fill="${r[4]>=r[2]&&r[4]<=r[3]?"var(--ink)":"var(--warn)"}"/>`).join("");
+  const yrs=[];let last=null;rows.forEach((r,i)=>{const yy=r[0].slice(0,4);if(yy!==last){if(last)yrs.push([i,yy]);last=yy}});
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="var(--faint)" stroke-width=".7"/>
+    ${yrs.map(([i,yy])=>`<line x1="${x(i)}" x2="${x(i)}" y1="0" y2="${H-14}" stroke="var(--line)"/><text x="${x(i)+3}" y="${H-2}" font-size="11" fill="var(--faint)">${yy}</text>`).join("")}
+    <path d="${band}" fill="var(--q4)" opacity=".18"/>
+    <path d="${med}" fill="none" stroke="var(--q4)" stroke-width="1.8" vector-effect="non-scaling-stroke"/>${dots}</svg>
+    <div class="legend" style="margin-top:4px"><span><i style="background:var(--q4)"></i>예상(중앙값·범위)</span><span><i style="background:var(--ink);border-radius:50%"></i>실제 (범위 안)</span><span><i style="background:var(--warn);border-radius:50%"></i>실제 (범위 밖)</span></div>`;
+}
 
 function renderRegime(){
   const r=S.d.regime, story=r.story;
@@ -277,7 +346,25 @@ function openAsset(id){
     ${(a.scenarios||[]).length?`<div class="card sec"><h4>흐름이 바뀌면</h4><table><tr><th>바뀌는 흐름</th><th class="n">13주 내 확률</th><th class="n">이번 달</th><th class="n">이번 분기</th></tr>
       ${a.scenarios.map(s=>{const dn=dimById(s.dim);return`<tr><td>${esc(dn.name)} → ${esc(s.to)}</td><td class="n">${fmt(s.prob,0)}%</td><td class="n" style="color:${col(s["1m"]?.median)}">${s["1m"]?sgn(s["1m"].median)+"%":"영향 없음"}</td><td class="n" style="color:${col(s["1q"]?.median)}">${s["1q"]?sgn(s["1q"].median)+"%":"영향 없음"}</td></tr>`}).join("")}</table></div>`:""}
     <div class="card sec"><h4>신뢰도: ${a.rel.label}</h4><p class="small" style="margin:0">${a.rel.since||""}부터 매주 그때까지의 데이터로만 예측했을 때 — 예측과 실제의 순위상관 이번 달 ${sgn(a.rel["1m"],2)}, 이번 분기 ${sgn(a.rel["1q"],2)} · 방향 적중률 이번 달 ${fmt(a.rel["1m_hit"],0)}%, 이번 분기 ${fmt(a.rel["1q_hit"],0)}%</p></div>
+    <div class="card sec" id="trkSec"><h4>지난 전망 vs 실제</h4><p class="small">불러오는 중…</p></div>
     <div class="card sec"><h4>최근 3년 가격</h4>${chart(a.hist)}</div>`;
+    loadTrack().then(tk=>{
+      const box=$("#trkSec"); if(!box) return;
+      const rows=tk.replay?.[a.id]?.[hz]||[], live=(tk.live||[]).filter(e=>e.asset===a.id&&e.hk===hz);
+      const sm=tk.summary?.[hz]?.per_asset?.[a.id];
+      if(!rows.length&&!live.length){box.innerHTML=`<h4>지난 전망 vs 실제</h4><p class="small">아직 비교할 기록이 없습니다.</p>`;return;}
+      const liveW=new Set(live.map(e=>e.week));
+      const recent=[...live.filter(e=>e.actual!=null).map(e=>[e.week,e.median,e.p25,e.p75,e.actual,e.signal,"실제 기록"]),
+                    ...rows.filter(r=>!liveW.has(r[0])).slice(-8).map(r=>[...r.slice(0,6),"재현"])].sort((p,q)=>q[0].localeCompare(p[0])).slice(0,8);
+      const pend=live.filter(e=>e.actual==null).sort((p,q)=>q.week.localeCompare(p.week))[0];
+      box.innerHTML=`<h4>지난 전망 vs 실제 (${L[hz]} 기준)</h4>
+        ${sm?`<p class="small" style="margin-top:0">최근 ${sm.n}번의 전망 중 방향 적중 <b>${fmt(sm.dir_hit,0)}%</b>, 범위 적중 ${fmt(sm.band_hit,0)}%, 평균 오차 ${fmt(sm.mae,1)}%p</p>`:""}
+        ${trackChart(rows)}
+        <table style="margin-top:10px"><tr><th>전망한 주</th><th class="n">예상</th><th class="n">실제</th><th class="n">차이</th><th></th></tr>
+        ${pend?`<tr><td>${fmtDay(pend.week)} <span class="tiny">실제 기록</span></td><td class="n">${sgn(pend.median)}%</td><td class="n tiny" colspan="3">${fmtDay(pend.due)} 확정</td></tr>`:""}
+        ${recent.map(r=>`<tr><td>${fmtDay(r[0])} <span class="tiny">${r[6]}</span></td><td class="n">${sgn(r[1])}%</td><td class="n" style="color:${col(r[4])}">${sgn(r[4])}%</td><td class="n">${sgn(r[4]-r[1])}</td><td>${okMark(r[1],r[4])}</td></tr>`).join("")}</table>
+        <p class="tiny">'실제 기록'은 앱이 그때 보여준 값, '재현'은 그 시점 데이터로 다시 계산한 값입니다.</p>`;
+    });
     $("#cl").onclick=closeSheet;
     $$("[data-h]").forEach(b=>b.onclick=()=>{hz=b.dataset.h;draw()});
   };
