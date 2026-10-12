@@ -16,6 +16,7 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(__file__))
 import fetch  # noqa: E402
 import regime as R  # noqa: E402
+import track  # noqa: E402
 from config import ASSETS, DIMS, H_LABEL, HISTORY_WEEKS, HORIZONS, START  # noqa: E402
 
 warnings.filterwarnings("ignore")
@@ -469,6 +470,16 @@ def main():
         "ranked": ranked, "assets": assets, "macro": macro_cards(W, raw, fed, fs),
         "backtest": backtest(preds, rets), "log": fetch.LOG[-120:],
     }
+    fetch.log("▶ 전망 vs 실제 비교 (실제 기록 + 과거 재현)")
+    tr = track.build(assets, S, rets, grid[-1], {a["id"]: a["name"] for a in assets})
+    for hk, sm in tr["summary"].items():
+        rp = sm["replay"] or {}
+        fetch.log(f"  {hk}: 과거 재현 {rp.get('n', 0)}건, 방향 적중 {rp.get('dir_hit', float('nan')):.0f}%, "
+                  f"범위 적중 {rp.get('band_hit', float('nan')):.0f}%, 평균 오차 {rp.get('mae', float('nan')):.1f}%p")
+    with open(os.path.join(ROOT, "data", "cache", "track.json"), "w", encoding="utf-8") as f:
+        json.dump(clean(tr), f, ensure_ascii=False, separators=(",", ":"))
+    out["track_summary"] = tr["summary"]
+
     path = os.path.join(ROOT, "data.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(clean(out), f, ensure_ascii=False, separators=(",", ":"))
